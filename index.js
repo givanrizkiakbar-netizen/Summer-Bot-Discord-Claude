@@ -17,6 +17,11 @@ const discord = new Client({
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ──────────────────────────────────────────────
+// CONFIG
+// ──────────────────────────────────────────────
+const ALLOWED_CHANNEL_ID = '1504884167958204557';
+
+// ──────────────────────────────────────────────
 // SYSTEM PROMPT — SUMMER
 // ──────────────────────────────────────────────
 const SUMMER_SYSTEM = `
@@ -212,6 +217,14 @@ discord.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const userId = interaction.user.id;
 
+  // Cek channel — hanya /tanya yang dibatasi channel
+  if (interaction.commandName === 'tanya' && interaction.channelId !== ALLOWED_CHANNEL_ID) {
+    return interaction.reply({
+      content: `❌ command ini cuma bisa dipake di <#${ALLOWED_CHANNEL_ID}> ya!`,
+      ephemeral: true,
+    });
+  }
+
   if (interaction.commandName === 'tanya') {
     const question = interaction.options.getString('pertanyaan');
     await interaction.deferReply();
@@ -255,10 +268,24 @@ discord.on('interactionCreate', async (interaction) => {
 // Handle mention & DM
 discord.on('messageCreate', async (message) => {
   if (message.author.bot) return;
-  const isMentioned = message.mentions.has(discord.user);
-  const isDM = message.channel.type === 1;
-  if (!isMentioned && !isDM) return;
 
+  const isDM = message.channel.type === 1;
+
+  // Cek apakah bot di-mention secara langsung (bukan @everyone atau @here)
+  const isMentionedDirectly = message.mentions.has(discord.user, { ignoreEveryone: true, ignoreRoles: true });
+
+  // Abaikan jika bukan DM dan bukan mention langsung ke bot
+  if (!isDM && !isMentionedDirectly) return;
+
+  // Abaikan pesan yang mengandung @everyone atau @here
+  if (message.mentions.everyone) return;
+
+  // Batasi channel — DM tetap boleh, server hanya di channel tertentu
+  if (!isDM && message.channelId !== ALLOWED_CHANNEL_ID) {
+    return message.reply(`❌ gue cuma bisa diajak ngobrol di <#${ALLOWED_CHANNEL_ID}> ya!`);
+  }
+
+  // Bersihkan mention dari teks
   const userText = message.content.replace(/<@!?\d+>/g, '').trim();
   if (!userText) return message.reply('yo, ada yang bisa gue bantu soal game? 🎮');
 
