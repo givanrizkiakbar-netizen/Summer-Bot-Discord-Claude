@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const Anthropic = require('@anthropic-ai/sdk');
 
 // ──────────────────────────────────────────────
@@ -19,7 +19,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // ──────────────────────────────────────────────
 // CONFIG
 // ──────────────────────────────────────────────
-const ALLOWED_CHANNEL_ID = '1504884167958204557';
+const ALLOWED_CHANNEL_ID = '1504884167958204557'; // satu-satunya channel yang dilayani
 
 // ──────────────────────────────────────────────
 // SYSTEM PROMPT — SUMMER
@@ -104,7 +104,7 @@ Summer: "...ugh kenapa sih harus nanya soal tu karakter 😩 yaudah fine. [jawab
 `.trim();
 
 // ──────────────────────────────────────────────
-// SESSION MANAGER (memori per user)
+// SESSION MANAGER
 // ──────────────────────────────────────────────
 const sessions = new Map();
 const MAX_HISTORY = 20;
@@ -136,7 +136,7 @@ function addMsg(userId, role, content) {
 function resetSession(userId) { sessions.delete(userId); }
 
 // ──────────────────────────────────────────────
-// ASK SUMMER (panggil Claude API)
+// ASK SUMMER
 // ──────────────────────────────────────────────
 async function askSummer(userId, userText) {
   addMsg(userId, 'user', userText);
@@ -174,11 +174,6 @@ function splitMessage(text, max = 1990) {
 // ──────────────────────────────────────────────
 const commands = [
   new SlashCommandBuilder()
-    .setName('tanya')
-    .setDescription('Tanya Summer soal dunia game')
-    .addStringOption(o => o.setName('pertanyaan').setDescription('Pertanyaan lo').setRequired(true)),
-
-  new SlashCommandBuilder()
     .setName('reset')
     .setDescription('Reset riwayat obrolan sama Summer'),
 
@@ -206,7 +201,7 @@ async function registerSlashCommands() {
 discord.once('ready', async () => {
   console.log(`✅ Summer aktif sebagai ${discord.user.tag}`);
   discord.user.setPresence({
-    activities: [{ name: '/tanya | @Summer | KomingUP 🎮', type: 2 }],
+    activities: [{ name: 'ngobrol di #ask-summer 🎮', type: 2 }],
     status: 'online',
   });
   await registerSlashCommands();
@@ -215,32 +210,9 @@ discord.once('ready', async () => {
 // Handle slash commands
 discord.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
-  const userId = interaction.user.id;
 
-  // Cek channel — hanya /tanya yang dibatasi channel
-  if (interaction.commandName === 'tanya' && interaction.channelId !== ALLOWED_CHANNEL_ID) {
-    return interaction.reply({
-      content: `❌ command ini cuma bisa dipake di <#${ALLOWED_CHANNEL_ID}> ya!`,
-      ephemeral: true,
-    });
-  }
-
-  if (interaction.commandName === 'tanya') {
-    const question = interaction.options.getString('pertanyaan');
-    await interaction.deferReply();
-    try {
-      const reply = await askSummer(userId, question);
-      const chunks = splitMessage(reply);
-      await interaction.editReply(chunks[0]);
-      for (let i = 1; i < chunks.length; i++) await interaction.followUp(chunks[i]);
-    } catch (e) {
-      console.error('/tanya error:', e);
-      await interaction.editReply('❌ aduh error nih, coba lagi ya bestie');
-    }
-  }
-
-  else if (interaction.commandName === 'reset') {
-    resetSession(userId);
+  if (interaction.commandName === 'reset') {
+    resetSession(interaction.user.id);
     await interaction.reply({
       content: '🔄 oke obrolan kita di-reset! fresh start, gaskeun 🎮',
       ephemeral: true,
@@ -265,29 +237,29 @@ discord.on('interactionCreate', async (interaction) => {
   }
 });
 
-// Handle mention & DM
+// Handle semua pesan di channel
 discord.on('messageCreate', async (message) => {
+  // Abaikan pesan dari bot manapun
   if (message.author.bot) return;
 
   const isDM = message.channel.type === 1;
 
-  // Cek apakah bot di-mention secara langsung (bukan @everyone atau @here)
-  const isMentionedDirectly = message.mentions.has(discord.user, { ignoreEveryone: true, ignoreRoles: true });
+  // Untuk pesan di server: hanya proses di channel yang diizinkan
+  if (!isDM && message.channelId !== ALLOWED_CHANNEL_ID) return;
 
-  // Abaikan jika bukan DM dan bukan mention langsung ke bot
-  if (!isDM && !isMentionedDirectly) return;
-
-  // Abaikan pesan yang mengandung @everyone atau @here
+  // Abaikan jika pesan mengandung @everyone atau @here
   if (message.mentions.everyone) return;
 
-  // Batasi channel — DM tetap boleh, server hanya di channel tertentu
-  if (!isDM && message.channelId !== ALLOWED_CHANNEL_ID) {
-    return message.reply(`❌ gue cuma bisa diajak ngobrol di <#${ALLOWED_CHANNEL_ID}> ya!`);
-  }
+  // Abaikan jika pesan hanya berisi tag role (tanpa teks lain)
+  // Cek: pesan mengandung role mention tapi TIDAK mention bot secara langsung
+  const mentionsRoleOnly =
+    message.mentions.roles.size > 0 &&
+    !message.mentions.has(discord.user, { ignoreEveryone: true, ignoreRoles: true });
+  if (mentionsRoleOnly) return;
 
   // Bersihkan mention dari teks
-  const userText = message.content.replace(/<@!?\d+>/g, '').trim();
-  if (!userText) return message.reply('yo, ada yang bisa gue bantu soal game? 🎮');
+  const userText = message.content.replace(/<@!?\d+>/g, '').replace(/<@&\d+>/g, '').trim();
+  if (!userText) return;
 
   await message.channel.sendTyping();
   try {
