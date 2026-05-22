@@ -245,7 +245,7 @@ discord.on('messageCreate', async (message) => {
   const isDM = message.channel.type === 1;
 
   // Untuk pesan di server: hanya proses di channel yang diizinkan
-  if (!isDM && message.channelId !== ALLOWED_CHANNEL_ID) return;
+if (!isDM && message.channelId !== ALLOWED_CHANNEL_ID) return;
 
   // Abaikan jika pesan mengandung @everyone atau @here
   if (message.mentions.everyone) return;
