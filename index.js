@@ -129,7 +129,7 @@ const WEB_SEARCH_TOOL = [
 // SESSION MANAGER
 // ──────────────────────────────────────────────
 const sessions = new Map();
-const MAX_HISTORY = 20;
+const MAX_HISTORY = 10;
 const SESSION_TTL = 60 * 60 * 1000;
 
 function getSession(userId) {
@@ -166,7 +166,7 @@ async function askSummer(userId, userText) {
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1500,
+    max_tokens: 1000,
     system: SUMMER_SYSTEM,
     messages: session.messages,
     tools: WEB_SEARCH_TOOL,
