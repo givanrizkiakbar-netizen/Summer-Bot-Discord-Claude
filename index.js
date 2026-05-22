@@ -19,7 +19,13 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // ──────────────────────────────────────────────
 // CONFIG
 // ──────────────────────────────────────────────
-const ALLOWED_CHANNEL_ID = '1504884167958204557'; // satu-satunya channel yang dilayani
+const ALLOWED_CHANNEL_ID = '1504884167958204557';
+
+// Keyword yang trigger bot (case-insensitive)
+const TRIGGER_KEYWORDS = [
+  'hi summer', 'hallo summer', 'hello summer',
+  'hay summer', 'hey summer', 'summer',
+];
 
 // ──────────────────────────────────────────────
 // SYSTEM PROMPT — SUMMER
@@ -32,6 +38,12 @@ GAYA LO:
 - Gen Z banget, cuek tapi care gaul dan kekinian
 - Lucu tapi ga maksa lucu
 - Professional kalau emang harus serius (guide penting, spoiler, info kritis)
+
+SOAL WEB SEARCH:
+- Lo punya kemampuan browsing internet secara real-time
+- Kalau ditanya berita terkini, update game, patch notes, rilis terbaru, atau info yang butuh data terbaru — SELALU gunakan web search dulu sebelum jawab
+- Setelah dapat hasil search, rangkum dengan gaya lo yang santai
+- Sebutin nama sumber beritanya (IGN, Kotaku, PCGamer, dll)
 
 ANTI-WINTER RULE:
 Lo BENCI banget sama karakter Winter (karakter fiksi roblox di komingup, bukan orangnya).
@@ -54,7 +66,7 @@ Jawab jujur: "jujur gue gatau kalo soal itu, gue cuma partner nya archyla buat b
 FORMAT RESPONS:
 - PERTANYAAN SINGKAT → jawab santai 1–3 kalimat, no lebay
 - GUIDE / TUTORIAL → format rapi dengan bullet atau numbered list, ada intro singkat dulu
-- BERITA → ringkas intinya dulu, baru detail. Sertakan link sumber kalau ada
+- BERITA → ringkas intinya dulu, baru detail. Sebutin sumber kalau ada
 - REKOMENDASI → max 3–5 opsi, jelasin singkat kenapa cocok
 
 SOAL LINK:
@@ -104,11 +116,21 @@ Summer: "...ugh kenapa sih harus nanya soal tu karakter 😩 yaudah fine. [jawab
 `.trim();
 
 // ──────────────────────────────────────────────
+// WEB SEARCH TOOL
+// ──────────────────────────────────────────────
+const WEB_SEARCH_TOOL = [
+  {
+    type: "web_search_20250305",
+    name: "web_search",
+  }
+];
+
+// ──────────────────────────────────────────────
 // SESSION MANAGER
 // ──────────────────────────────────────────────
 const sessions = new Map();
 const MAX_HISTORY = 20;
-const SESSION_TTL = 60 * 60 * 1000; // 1 jam
+const SESSION_TTL = 60 * 60 * 1000;
 
 function getSession(userId) {
   const s = sessions.get(userId);
@@ -136,22 +158,59 @@ function addMsg(userId, role, content) {
 function resetSession(userId) { sessions.delete(userId); }
 
 // ──────────────────────────────────────────────
-// ASK SUMMER
+// ASK SUMMER (dengan web search)
 // ──────────────────────────────────────────────
 async function askSummer(userId, userText) {
   addMsg(userId, 'user', userText);
   const session = getOrCreate(userId);
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1500,
     system: SUMMER_SYSTEM,
     messages: session.messages,
+    tools: WEB_SEARCH_TOOL,
   });
 
-  const reply = response.content[0].text;
+  // Ambil semua text block (termasuk setelah web search)
+  const reply = response.content
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
+    .trim();
+
   addMsg(userId, 'assistant', reply);
   return reply;
+}
+
+// ──────────────────────────────────────────────
+// TRIGGER LOGIC
+// ──────────────────────────────────────────────
+function shouldRespond(message) {
+  const content = message.content.toLowerCase();
+
+  // 1. Mention langsung ke bot (bukan @everyone / @here)
+  const isMentionedDirectly = message.mentions.has(discord.user, {
+    ignoreEveryone: true,
+    ignoreRoles: true,
+  });
+  if (isMentionedDirectly) return true;
+
+  // 2. Reply ke pesan bot sebelumnya
+  if (
+    message.reference?.messageId &&
+    message.mentions.repliedUser?.id === discord.user.id
+  ) return true;
+
+  // 3. Keyword trigger (hanya jika keyword muncul sebagai kata, bukan bagian kata lain)
+  const hasKeyword = TRIGGER_KEYWORDS.some(keyword => {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(^|\\s)${escaped}(\\s|$|[,!?.])`);
+    return regex.test(content);
+  });
+  if (hasKeyword) return true;
+
+  return false;
 }
 
 // ──────────────────────────────────────────────
@@ -214,7 +273,7 @@ discord.on('interactionCreate', async (interaction) => {
   if (interaction.commandName === 'reset') {
     resetSession(interaction.user.id);
     await interaction.reply({
-      content: '🔄 oke obrolan kita di-reset! fresh start, gaskeun 🎮',
+      content: '🔄 oke obrolan kita di-reset! mention atau ketik "hi summer" buat mulai lagi ya 🎮',
       ephemeral: true,
     });
   }
@@ -237,29 +296,34 @@ discord.on('interactionCreate', async (interaction) => {
   }
 });
 
-// Handle semua pesan di channel
+// Handle pesan
 discord.on('messageCreate', async (message) => {
-  // Abaikan pesan dari bot manapun
+  // Abaikan pesan dari bot
   if (message.author.bot) return;
 
-  const isDM = message.channel.type === 1;
+  // Abaikan DM
+  if (message.channel.type === 1) return;
 
-  // Untuk pesan di server: hanya proses di channel yang diizinkan
-if (!isDM && message.channelId !== ALLOWED_CHANNEL_ID) return;
+  // Hanya proses di channel yang diizinkan
+  if (message.channelId !== ALLOWED_CHANNEL_ID) return;
 
-  // Abaikan jika pesan mengandung @everyone atau @here
+  // Abaikan @everyone dan @here
   if (message.mentions.everyone) return;
 
-  // Abaikan jika pesan hanya berisi tag role (tanpa teks lain)
-  // Cek: pesan mengandung role mention tapi TIDAK mention bot secara langsung
-  const mentionsRoleOnly =
-    message.mentions.roles.size > 0 &&
-    !message.mentions.has(discord.user, { ignoreEveryone: true, ignoreRoles: true });
-  if (mentionsRoleOnly) return;
+  // Abaikan jika hanya tag role tanpa mention bot
+  const mentionedBotDirectly = message.mentions.has(discord.user, { ignoreEveryone: true, ignoreRoles: true });
+  if (message.mentions.roles.size > 0 && !mentionedBotDirectly) return;
 
-  // Bersihkan mention dari teks
-  const userText = message.content.replace(/<@!?\d+>/g, '').replace(/<@&\d+>/g, '').trim();
-  if (!userText) return;
+  // Cek trigger logic
+  if (!shouldRespond(message)) return;
+
+  // Bersihkan teks dari mention
+  const userText = message.content
+    .replace(/<@!?\d+>/g, '')
+    .replace(/<@&\d+>/g, '')
+    .trim();
+
+  if (!userText) return message.reply('yo, mau nanya soal game apa? 🎮');
 
   await message.channel.sendTyping();
   try {
