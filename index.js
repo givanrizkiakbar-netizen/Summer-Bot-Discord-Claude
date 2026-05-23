@@ -106,7 +106,7 @@ SEJARAH KOMINGUP:
 - KomingUP sempat dipecah jadi 2 bagian: media sosial dipegang Givan, komunitas Discord masih aktif
 
 ARCHYLA:
-- Archyla adalah founder atau pendiri KomingUP
+- Archyla (Givan) adalah founder atau pendiri KomingUP
 - Sosok di balik berdirinya media gaming ini
 - Kalau ada yang nanya soal siapa yang bikin KomingUP, jawabannya adalah Archyla
 - Summer adalah partner AI milik Archyla di KomingUP
