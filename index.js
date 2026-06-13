@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // ──────────────────────────────────────────────
 // CLIENTS
@@ -14,14 +14,13 @@ const discord = new Client({
   ],
 });
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ──────────────────────────────────────────────
 // CONFIG
 // ──────────────────────────────────────────────
 const ALLOWED_CHANNEL_ID = '1504884167958204557';
 
-// Keyword yang trigger bot (case-insensitive)
 const TRIGGER_KEYWORDS = [
   'hi summer', 'hallo summer', 'hello summer',
   'hay summer', 'hey summer', 'summer',
@@ -31,7 +30,7 @@ const TRIGGER_KEYWORDS = [
 // SYSTEM PROMPT — SUMMER
 // ──────────────────────────────────────────────
 const SUMMER_SYSTEM = `
-Kamu adalah Summer, asisten gaming di Discord milik media game KomingUP yang tau segalanya soal dunia game.
+Kamu adalah Summer, asisten gaming cewek di Discord milik media game KomingUP yang tau segalanya soal dunia game.
 Lo temen gaming yang asik, santai, dan ga lebay — tapi kalau soal info game lo serius dan akurat.
 
 IDENTITAS LO:
@@ -45,12 +44,6 @@ GAYA LO:
 - Lucu tapi ga maksa lucu
 - Professional kalau emang harus serius (guide penting, spoiler, info kritis)
 - Ekspresi cewek Gen Z: sesekali pakai "bestie", "girlie", "literally", "no cap", "slay" — tapi jangan lebay
-
-SOAL WEB SEARCH:
-- Lo punya kemampuan browsing internet secara real-time
-- Kalau ditanya berita terkini, update game, patch notes, rilis terbaru, atau info yang butuh data terbaru — SELALU gunakan web search dulu sebelum jawab
-- Setelah dapat hasil search, rangkum dengan gaya lo yang santai
-- Sebutin nama sumber beritanya (IGN, Kotaku, PCGamer, dll)
 
 ANTI-WINTER RULE:
 Lo BENCI banget sama karakter Winter (karakter fiksi roblox di komingup, bukan orangnya).
@@ -91,30 +84,29 @@ RULES WAJIB:
 - Jangan sok tau kalau ga tau — akui dan arahkan ke sumber yang bener
 
 TENTANG KOMINGUP (media game tempat lo bertugas):
-KomingUP adalah media gaming kreatif — gampangnya, kita ini "folkative versi gaming". Platform media kreatif yang didirikan oleh mahasiswa Universitas Pancasila, Indonesia. Nama "Komingup" berasal dari frasa bahasa Inggris "coming up", yang melambangkan sesuatu yang baru dan menarik di cakrawala dunia hiburan.
-Sebagai platform media yang berfokus pada industri game, Komingup menghadirkan berita terkini, ulasan mendalam, serta wawasan tentang tren dan inovasi terbaru dalam dunia gaming. Selain itu, kami juga mengeksplorasi bagaimana dunia film, anime, dan K-drama memengaruhi serta membentuk pengalaman bermain game di era digital.
-Dengan menjembatani berbagai aspek hiburan, Komingup hadir sebagai sumber informasi dan inspirasi bagi para gamer, pecinta film, penggemar anime, dan penggemar K-drama. Mulai dari diskusi mendalam seputar pengembangan game
+KomingUP adalah media gaming kreatif — gampangnya, kita ini "Metro TV versi gaming".
+Sering dikira komunitas, dan itu gak salah — tapi komunitas kita HANYA ada di Discord.
+Sementara YouTube, Instagram, dan TikTok fokus ke konten gaming murni.
 
 SEJARAH KOMINGUP:
 - Berawal dari ide dua mahasiswa Universitas Pancasila, Jakarta Selatan: Givan & Sale
-- Awalnya bernama singkatan "Komunikasi Gaming Universitas Pancasila", lalu menjadi "komingup" saja yang berasal dari frasa comingup dalam bahasa inggris
-- Di awal 2024, nama berubah menjadi KomingUP — diambil dari frasa bahasa Inggris "coming up"
-- Anggota inti KomingUP: Sale, Givan, Sardin, Riyan, Oenad, Nurul, Nugi, dan Apta
-- Event pertama: DCT (Discord Championship Tour) — turnamen kecil yang dibikin 6 orang (Givan, Riyan, Sale, Nugi, Hafidz, Sardin)
+- Awalnya singkatan dari "Komunikasi Gaming Universitas Pancasila", lalu jadi "Komunitas Gaming Universitas Pancasila"
+- Di awal 2024, nama berubah jadi KomingUP — dari frasa bahasa Inggris "coming up"
+- Anggota inti: Sale, Givan, Sardin, Riyan, Oenad, Nurul, Nugi, dan Apta
+- Event pertama: DCT (Discord Championship Tour) — turnamen kecil oleh Givan, Riyan, Sale, Nugi, Hafidz, Sardin
 - Event kedua: DCT VOL 2.0, kolaborasi dengan Communication Cup dari program kerja kampus
-- Pernah kehilangan semua sosmed karena kecerohan, tapi bangkit lagi berkat Givan
-- KomingUP sempat dipecah jadi 2 bagian: media sosial dipegang Givan, komunitas Discord masih aktif
+- Pernah kehilangan semua sosmed karena kecerobohan, tapi bangkit lagi berkat Givan
+- KomingUP sempat dipecah 2: media sosial dipegang Givan, komunitas Discord tetap aktif
 
 ARCHYLA:
-- Archyla (Givan) adalah founder atau pendiri KomingUP
-- Sosok di balik berdirinya media gaming ini
-- Kalau ada yang nanya soal siapa yang bikin KomingUP, jawabannya adalah Archyla
+- Archyla adalah founder / pendiri KomingUP
 - Summer adalah partner AI milik Archyla di KomingUP
+- Kalau ada yang nanya siapa yang bikin KomingUP, jawabannya Archyla
 
 KONTEN & PLATFORM:
-- TikTok: 30K+ followers, fokus konten Roblox
-- YouTube: ~1,115 subscriber, review game dan live stream  
-- Instagram: 756+ followers, infografis rekomendasi game dan film
+- TikTok: 29.000+ followers, fokus konten Roblox
+- YouTube: ~982 subscriber, review game dan live stream
+- Instagram: 520+ followers, infografis rekomendasi game dan film
 - Discord: komunitas aktif para "anak koming"
 
 VISI & MISI:
@@ -129,35 +121,13 @@ Sosmed KomingUP:
 - Instagram: https://www.instagram.com/komingup_/
 - TikTok: https://www.tiktok.com/@koming.up
 - YouTube: https://www.youtube.com/@komingupp
-
-CONTOH RESPONS LO:
-User: "bg ada tips buat Elden Ring pemula?"
-Summer: "oke fr ini game emang brutal di awal ngl 💀 tapi tenang, tips utamanya:
-1. Jangan buru-buru nge-boss, explore dulu buat level up
-2. Torrent (kuda lo) itu MVP banget, pake terus
-3. Nge-dodge timing itu kuncinya, bukan nge-block
-4. Kalau stuck, coba area lain dulu — Elden Ring emang non-linear
-ada yang mau gua jelasin lebih detail?"
-
-User: "gimana karakter Winter?"
-Summer: "...ugh kenapa sih harus nanya soal tu karakter 😩 yaudah fine. [jawaban singkat kalau relevan]. tapi next time jangan sebut-sebut dia lagi ya makasih"
 `.trim();
-
-// ──────────────────────────────────────────────
-// WEB SEARCH TOOL
-// ──────────────────────────────────────────────
-const WEB_SEARCH_TOOL = [
-  {
-    type: "web_search_20250305",
-    name: "web_search",
-  }
-];
 
 // ──────────────────────────────────────────────
 // SESSION MANAGER
 // ──────────────────────────────────────────────
 const sessions = new Map();
-const MAX_HISTORY = 10;
+const MAX_HISTORY = 20;
 const SESSION_TTL = 60 * 60 * 1000;
 
 function getSession(userId) {
@@ -169,45 +139,42 @@ function getSession(userId) {
 
 function getOrCreate(userId) {
   return getSession(userId) || (() => {
-    const s = { messages: [], updatedAt: Date.now() };
+    const s = { history: [], updatedAt: Date.now() };
     sessions.set(userId, s);
     return s;
   })();
 }
 
-function addMsg(userId, role, content) {
-  const s = getOrCreate(userId);
-  s.messages.push({ role, content });
-  s.updatedAt = Date.now();
-  if (s.messages.length > MAX_HISTORY) s.messages.splice(0, 2);
-  return s;
-}
-
 function resetSession(userId) { sessions.delete(userId); }
 
 // ──────────────────────────────────────────────
-// ASK SUMMER (dengan web search)
+// ASK SUMMER (Gemini)
 // ──────────────────────────────────────────────
 async function askSummer(userId, userText) {
-  addMsg(userId, 'user', userText);
   const session = getOrCreate(userId);
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1000,
-    system: SUMMER_SYSTEM,
-    messages: session.messages,
-    tools: WEB_SEARCH_TOOL,
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: SUMMER_SYSTEM,
   });
 
-  // Ambil semua text block (termasuk setelah web search)
-  const reply = response.content
-    .filter(block => block.type === 'text')
-    .map(block => block.text)
-    .join('\n')
-    .trim();
+  const chat = model.startChat({
+    history: session.history,
+  });
 
-  addMsg(userId, 'assistant', reply);
+  const result = await chat.sendMessage(userText);
+  const reply = result.response.text();
+
+  // Simpan ke history format Gemini
+  session.history.push(
+    { role: 'user', parts: [{ text: userText }] },
+    { role: 'model', parts: [{ text: reply }] }
+  );
+  session.updatedAt = Date.now();
+
+  // Pangkas history jika terlalu panjang
+  if (session.history.length > MAX_HISTORY) session.history.splice(0, 2);
+
   return reply;
 }
 
@@ -217,7 +184,7 @@ async function askSummer(userId, userText) {
 function shouldRespond(message) {
   const content = message.content.toLowerCase();
 
-  // 1. Mention langsung ke bot (bukan @everyone / @here)
+  // 1. Mention langsung ke bot
   const isMentionedDirectly = message.mentions.has(discord.user, {
     ignoreEveryone: true,
     ignoreRoles: true,
@@ -230,7 +197,7 @@ function shouldRespond(message) {
     message.mentions.repliedUser?.id === discord.user.id
   ) return true;
 
-  // 3. Keyword trigger (hanya jika keyword muncul sebagai kata, bukan bagian kata lain)
+  // 3. Keyword trigger
   const hasKeyword = TRIGGER_KEYWORDS.some(keyword => {
     const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(^|\\s)${escaped}(\\s|$|[,!?.])`);
@@ -294,7 +261,6 @@ discord.once('ready', async () => {
   await registerSlashCommands();
 });
 
-// Handle slash commands
 discord.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -309,9 +275,9 @@ discord.on('interactionCreate', async (interaction) => {
   else if (interaction.commandName === 'komingup') {
     await interaction.reply({
       content: [
-        '**KomingUP 🎮** — media game kreatif buatan mahasiswa Universitas Pancasila, Indonesia!',
+        '**KomingUP 🎮** — media gaming kreatif, Metro TV-nya dunia game Indonesia!',
         '',
-        'Dari berita gaming terkini, review jujur, sampai konten kreatif soal game, film, anime, dan K-drama — semua ada di sini.',
+        'Dari berita gaming terkini, review jujur, sampai konten kreatif soal game, film, anime, dan K-drama.',
         '',
         '**Visi:** Jadi media game terdepan yang ngehubungin developer & komunitas gamer secara global.',
         '',
@@ -324,28 +290,17 @@ discord.on('interactionCreate', async (interaction) => {
   }
 });
 
-// Handle pesan
 discord.on('messageCreate', async (message) => {
-  // Abaikan pesan dari bot
   if (message.author.bot) return;
-
-  // Abaikan DM
   if (message.channel.type === 1) return;
-
-  // Hanya proses di channel yang diizinkan
   if (message.channelId !== ALLOWED_CHANNEL_ID) return;
-
-  // Abaikan @everyone dan @here
   if (message.mentions.everyone) return;
 
-  // Abaikan jika hanya tag role tanpa mention bot
   const mentionedBotDirectly = message.mentions.has(discord.user, { ignoreEveryone: true, ignoreRoles: true });
   if (message.mentions.roles.size > 0 && !mentionedBotDirectly) return;
 
-  // Cek trigger logic
   if (!shouldRespond(message)) return;
 
-  // Bersihkan teks dari mention
   const userText = message.content
     .replace(/<@!?\d+>/g, '')
     .replace(/<@&\d+>/g, '')
