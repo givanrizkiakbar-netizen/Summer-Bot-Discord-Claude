@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
 // ──────────────────────────────────────────────
 // CLIENTS
@@ -14,7 +14,7 @@ const discord = new Client({
   ],
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ──────────────────────────────────────────────
 // CONFIG
@@ -139,42 +139,40 @@ function getSession(userId) {
 
 function getOrCreate(userId) {
   return getSession(userId) || (() => {
-    const s = { history: [], updatedAt: Date.now() };
+    const s = { messages: [], updatedAt: Date.now() };
     sessions.set(userId, s);
     return s;
   })();
 }
 
+function addMsg(userId, role, content) {
+  const s = getOrCreate(userId);
+  s.messages.push({ role, content });
+  s.updatedAt = Date.now();
+  if (s.messages.length > MAX_HISTORY) s.messages.splice(0, 2);
+  return s;
+}
+
 function resetSession(userId) { sessions.delete(userId); }
 
 // ──────────────────────────────────────────────
-// ASK SUMMER (Gemini)
+// ASK SUMMER (Groq)
 // ──────────────────────────────────────────────
 async function askSummer(userId, userText) {
+  addMsg(userId, 'user', userText);
   const session = getOrCreate(userId);
 
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    systemInstruction: SUMMER_SYSTEM,
+  const response = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile', // model terbaik Groq, gratis
+    max_tokens: 1500,
+    messages: [
+      { role: 'system', content: SUMMER_SYSTEM },
+      ...session.messages,
+    ],
   });
 
-  const chat = model.startChat({
-    history: session.history,
-  });
-
-  const result = await chat.sendMessage(userText);
-  const reply = result.response.text();
-
-  // Simpan ke history format Gemini
-  session.history.push(
-    { role: 'user', parts: [{ text: userText }] },
-    { role: 'model', parts: [{ text: reply }] }
-  );
-  session.updatedAt = Date.now();
-
-  // Pangkas history jika terlalu panjang
-  if (session.history.length > MAX_HISTORY) session.history.splice(0, 2);
-
+  const reply = response.choices[0].message.content;
+  addMsg(userId, 'assistant', reply);
   return reply;
 }
 
