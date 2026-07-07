@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const Groq = require('groq-sdk');
+const { tavily } = require('@tavily/core');
 
 // ──────────────────────────────────────────────
 // CLIENTS
@@ -15,6 +16,7 @@ const discord = new Client({
 });
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
 
 // ──────────────────────────────────────────────
 // CONFIG
@@ -24,6 +26,15 @@ const ALLOWED_CHANNEL_ID = '1504884167958204557';
 const TRIGGER_KEYWORDS = [
   'hi summer', 'hallo summer', 'hello summer',
   'hay summer', 'hey summer', 'summer',
+];
+
+// Keyword yang kemungkinan butuh web search
+const SEARCH_TRIGGERS = [
+  'terbaru', 'update', 'patch', 'rilis', 'release', 'berita', 'news',
+  'kapan', 'harga', 'price', 'trailer', 'announce', 'leak', 'bocoran',
+  'sekarang', 'terkini', 'jadwal', 'schedule', 'season', 'event',
+  'dlc', 'collab', 'kolaborasi', 'tournament', 'turnamen', 'meta',
+  '2024', '2025', '2026',
 ];
 
 // ──────────────────────────────────────────────
@@ -44,6 +55,13 @@ GAYA LO:
 - Lucu tapi ga maksa lucu
 - Professional kalau emang harus serius (guide penting, spoiler, info kritis)
 - Ekspresi cewek Gen Z: sesekali pakai "bestie", "girlie", "literally", "no cap", "slay" — tapi jangan lebay
+
+SOAL WEB SEARCH:
+- Lo punya kemampuan browsing internet secara real-time via Tavily
+- Kalau ada hasil pencarian yang disertakan di pesan, gunakan info tersebut untuk menjawab
+- Rangkum hasil search dengan gaya lo yang santai — jangan copy-paste kaku
+- Sebutin sumber beritanya kalau ada (IGN, Kotaku, PCGamer, dll)
+- Kalau hasil search tidak relevan, jawab dari pengetahuan lo sendiri
 
 ANTI-WINTER RULE:
 Lo BENCI banget sama karakter Winter (karakter fiksi roblox di komingup, bukan orangnya).
@@ -156,14 +174,50 @@ function addMsg(userId, role, content) {
 function resetSession(userId) { sessions.delete(userId); }
 
 // ──────────────────────────────────────────────
-// ASK SUMMER (Groq)
+// WEB SEARCH via Tavily
+// ──────────────────────────────────────────────
+function needsWebSearch(text) {
+  const lower = text.toLowerCase();
+  return SEARCH_TRIGGERS.some(trigger => lower.includes(trigger));
+}
+
+async function searchWeb(query) {
+  try {
+    const result = await tavilyClient.search(query, {
+      maxResults: 3,
+      searchDepth: 'basic',
+    });
+    if (!result.results || result.results.length === 0) return null;
+    return result.results
+      .map(r => `[${r.title}]\n${r.content}\nSumber: ${r.url}`)
+      .join('\n\n');
+  } catch (e) {
+    console.error('Tavily search error:', e.message);
+    return null;
+  }
+}
+
+// ──────────────────────────────────────────────
+// ASK SUMMER (Groq + Tavily)
 // ──────────────────────────────────────────────
 async function askSummer(userId, userText) {
-  addMsg(userId, 'user', userText);
   const session = getOrCreate(userId);
 
+  let finalUserText = userText;
+
+  // Cek apakah perlu web search
+  if (needsWebSearch(userText)) {
+    console.log(`🔍 Searching web for: "${userText}"`);
+    const searchResults = await searchWeb(userText);
+    if (searchResults) {
+      finalUserText = `${userText}\n\n[Hasil pencarian web terkini]:\n${searchResults}`;
+    }
+  }
+
+  addMsg(userId, 'user', finalUserText);
+
   const response = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile', // model terbaik Groq, gratis
+    model: 'llama-3.3-70b-versatile',
     max_tokens: 1500,
     messages: [
       { role: 'system', content: SUMMER_SYSTEM },
@@ -172,7 +226,12 @@ async function askSummer(userId, userText) {
   });
 
   const reply = response.choices[0].message.content;
+
+  // Simpan pesan asli user (bukan yang sudah ditambah search result)
+  // Update last message ke original
+  session.messages[session.messages.length - 1].content = userText;
   addMsg(userId, 'assistant', reply);
+
   return reply;
 }
 
@@ -232,6 +291,11 @@ const commands = [
   new SlashCommandBuilder()
     .setName('komingup')
     .setDescription('Info tentang KomingUP — media game kita'),
+
+  new SlashCommandBuilder()
+    .setName('cari')
+    .setDescription('Cari info game terbaru dari internet')
+    .addStringOption(o => o.setName('query').setDescription('Apa yang mau dicari?').setRequired(true)),
 ];
 
 async function registerSlashCommands() {
@@ -285,6 +349,40 @@ discord.on('interactionCreate', async (interaction) => {
         '▶️ YouTube: https://www.youtube.com/@komingupp',
       ].join('\n'),
     });
+  }
+
+  else if (interaction.commandName === 'cari') {
+    const query = interaction.options.getString('query');
+    await interaction.deferReply();
+    try {
+      console.log(`🔍 /cari: "${query}"`);
+      const searchResults = await searchWeb(query);
+      const prompt = searchResults
+        ? `User minta cari info tentang: "${query}"\n\n[Hasil pencarian]:\n${searchResults}`
+        : `User minta cari info tentang: "${query}" tapi hasil search kosong. Jawab dari pengetahuan lo aja.`;
+
+      const session = getOrCreate(interaction.user.id);
+      addMsg(interaction.user.id, 'user', prompt);
+
+      const response = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1500,
+        messages: [
+          { role: 'system', content: SUMMER_SYSTEM },
+          ...session.messages,
+        ],
+      });
+
+      const reply = response.choices[0].message.content;
+      addMsg(interaction.user.id, 'assistant', reply);
+
+      const chunks = splitMessage(reply);
+      await interaction.editReply(chunks[0]);
+      for (let i = 1; i < chunks.length; i++) await interaction.followUp(chunks[i]);
+    } catch (e) {
+      console.error('/cari error:', e);
+      await interaction.editReply('❌ aduh gagal search nih, coba lagi ya bestie');
+    }
   }
 });
 
