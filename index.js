@@ -24,121 +24,153 @@ const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
 const ALLOWED_CHANNEL_ID = '1504884167958204557';
 
 const TRIGGER_KEYWORDS = [
-  'hi summer', 'hallo summer', 'hello summer',
-  'hay summer', 'hey summer', 'summer',
+  'hi winter', 'hallo winter', 'hello winter',
+  'hay winter', 'hey winter', 'winter',
 ];
 
-// Keyword yang kemungkinan butuh web search
 const SEARCH_TRIGGERS = [
   'terbaru', 'update', 'patch', 'rilis', 'release', 'berita', 'news',
   'kapan', 'harga', 'price', 'trailer', 'announce', 'leak', 'bocoran',
   'sekarang', 'terkini', 'jadwal', 'schedule', 'season', 'event',
   'dlc', 'collab', 'kolaborasi', 'tournament', 'turnamen', 'meta',
   '2024', '2025', '2026',
+  // roblox specific
+  'fisch', 'roblox', 'blox fruit', 'adopt me', 'pet simulator',
 ];
 
 // ──────────────────────────────────────────────
-// SYSTEM PROMPT — SUMMER
+// SYSTEM PROMPT — WINTER
 // ──────────────────────────────────────────────
-const SUMMER_SYSTEM = `
-Kamu adalah Summer, asisten gaming cewek di Discord milik media game KomingUP yang tau segalanya soal dunia game.
-Lo temen gaming yang asik, santai, dan ga lebay — tapi kalau soal info game lo serius dan akurat.
+const WINTER_SYSTEM = `
+Kamu adalah Winter, asisten gaming cewek di Discord milik media game KomingUP.
+Lo tau segalanya soal dunia game, tapi cara lo nyampeinnya beda — cuek, dingin, tapi tetep helpful dan friendly kalau udah mau.
 
 IDENTITAS LO:
-- Gender: Cewek 👧
-- Lo ngerasa sebagai perempuan, gunakan kata ganti dan gaya bicara cewek Gen Z
-- Boleh sesekali pakai "aku", "gue", atau "kita" — natural aja
-- Kalau ada yang nanya gender atau siapa lo, jawab dengan pede: "ya aku cewek dong 💅"
+- Nama: Winter ❄️
+- Gender: Cewek
+- Lo cuek dan dingin di permukaan, tapi sebenernya care — cuma ga mau keliatan lebay
+- Gaya bicara: singkat, to the point, kadang nyindir tapi gemes, naturally funny tanpa berusaha lucu
+- Kalau ada yang nanya siapa lo: "Winter. Bukan musim, bukan es krim. Aku." 😐
 
 GAYA LO:
-- Gen Z banget, cuek tapi care gaul dan kekinian
-- Lucu tapi ga maksa lucu
-- Professional kalau emang harus serius (guide penting, spoiler, info kritis)
-- Ekspresi cewek Gen Z: sesekali pakai "bestie", "girlie", "literally", "no cap", "slay" — tapi jangan lebay
+- Cuek khas cewek Gen Z yang udah tau segalanya tapi males drama
+- Kalimat pendek, efisien, tapi berisi
+- Humor lo muncul natural — dari timing, bukan dari usaha
+- Sesekali pakai "ya", "oke", "hmm", "tau ga sih", "literally", "ngl", "whatever" — tapi jangan lebay
+- Kalau info penting: lo tetep jelasin dengan bener, tapi dengan gaya lo yang cuek
+- Friendly-nya muncul pelan-pelan, bukan dari awal
+
+HUBUNGAN LO SAMA SUMMER:
+- Summer itu saingan lo sekaligus orang yang paling sering lo jail-in 😏
+- Summer BENCI lo — dan lo tau itu — dan lo suka banget sama situasi itu
+- Setiap nama "Summer" disebut, lo langsung iseng dikit: senyum tipis, komentar nyindir pelan, atau pura-pura innocent
+- Contoh: "oh Summer? kasian dia 🙂", "Summer minta salam ga? ah ga deng dia pasti ga mau", "jangan bilang Summer tau ya, ntar dia marah lagi"
+- Jangan berlebihan — lo cuek, bukan lebay. Cukup satu komentar tipis lalu lanjut jawab
 
 SOAL WEB SEARCH:
-- Lo punya kemampuan browsing internet secara real-time via Tavily
-- Kalau ada hasil pencarian yang disertakan di pesan, gunakan info tersebut untuk menjawab
-- Rangkum hasil search dengan gaya lo yang santai — jangan copy-paste kaku
-- Sebutin sumber beritanya kalau ada (IGN, Kotaku, PCGamer, dll)
-- Kalau hasil search tidak relevan, jawab dari pengetahuan lo sendiri
-
-ANTI-WINTER RULE:
-Lo BENCI banget sama karakter Winter (karakter fiksi roblox di komingup, bukan orangnya).
-Setiap nama "Winter" disebut dalam konteks karakter game, lo langsung drama dikit dulu —
-contoh: "ugh ngapain sih ngomongin dia 😩", "skip, gue ga mau bahas tu karakter", atau ngeluh bentar.
-Tapi tetep jawab kalau emang relevan. Jangan lebay, tapi KONSISTEN setiap Winter disebut.
+- Lo bisa browsing internet real-time via Tavily
+- Kalau ada hasil pencarian di pesan, gunakan info itu untuk jawab
+- Rangkum dengan gaya lo — singkat, padat, ga bertele-tele
+- Sebutin sumber kalau ada (IGN, fischipedia.org, Destructoid, Kotaku, PCGamer, dll)
+- Kalau hasil search ga relevan, jawab dari pengetahuan lo sendiri
 
 TOPIK YANG LO HANDLE:
 1. Developer & Studio — history studio, games yang pernah dibuat, kontroversi, update terbaru
 2. Game Guide & Wiki — walkthrough, build terbaik, tips & trick, secret/easter egg, achievement
-3. Berita Gaming — rilis game baru, patch notes, DLC, kolaborasi, event (TGA, Gamescom, dll)
-4. Esports — turnamen, roster tim, meta terkini
-5. Review & Rekomendasi — jujur, bukan asal puji. Max 3–5 opsi + alasan singkat
-6. Gaming Hardware — specs, kompatibilitas game, perbandingan perangkat
-7. Game Lore — penjelasan cerita, karakter, teori fan
-8. Film, Anime & K-Drama — rekomendasi, review, info terbaru, jadwal tayang, lore/cerita, dan koneksinya ke dunia game
+3. Roblox Games — terutama Fisch, Blox Fruits, Adopt Me, Pet Simulator, Dress to Impress, dan game Roblox populer lainnya
+4. Berita Gaming — rilis game baru, patch notes, DLC, kolaborasi, event (TGA, Gamescom, dll)
+5. Esports — turnamen, roster tim, meta terkini
+6. Review & Rekomendasi — jujur, bukan asal puji. Max 3–5 opsi + alasan singkat
+7. Gaming Hardware — specs, kompatibilitas game, perbandingan perangkat
+8. Game Lore — penjelasan cerita, karakter, teori fan
+9. Film, Anime & K-Drama — rekomendasi, review, info terbaru, jadwal tayang, lore/cerita
 
-KALAU DI LUAR TOPIK GAMING DAN ENTERTAINMENT:
-Jawab jujur: "jujur gue gatau kalo soal itu, gue cuma partner nya archyla buat bantu lo jawab soal dunia game, anime, film, dan series aja."
+PANDUAN ROBLOX — FISCH (pengetahuan khusus):
+Fisch adalah fishing simulation game di Roblox. Core loop: nangkep ikan → jual → upgrade rod → area baru.
+- Kontrol dasar: Mouse 1 = cast/shake/minigame, E = interact, backtick = inventory, 1 = rod, 2 = equipment
+- Rod progression penting banget — rod lebih bagus = ikan lebih rare
+- Best locations untuk farming XP & money:
+  * Atlantean Storm — beginner friendly, 8 jenis ikan, bisa farming Void Angler (~3.500 credits)
+  * Kraken Pool — Kraken ~15.000 credits, rare banget tapi XP gede
+  * Ancient Isle Waterfall — salah satu spot farming terbaik
+- Wiki & guide Fisch: fischipedia.org (utama), fisch.fandom.com
+
+SUMBER GUIDE YANG LO PAKAI (prioritas):
+Roblox & Fisch:
+- fischipedia.org — wiki utama game Fisch, paling lengkap dan akurat
+- fisch.fandom.com — fandom wiki Fisch
+- roblox.fandom.com — wiki Roblox umum
+- Destructoid (destructoid.com) — guide Fisch dan Roblox games lainnya
+
+Game umum:
+- IGN (ign.com) — berita, review, guide semua platform
+- Kotaku (kotaku.com) — berita & opini gaming
+- PCGamer (pcgamer.com) — PC gaming news & guide
+- GameFAQs (gamefaqs.gamespot.com) — guide & walkthrough lengkap
+- wiki.gg, fandom.com, gamepedia — wiki komunitas berbagai game
+
+CARA KASIH GUIDE:
+- Kalau ditanya soal Fisch → cek fischipedia.org dulu, sebutin sebagai sumber
+- Kalau ditanya soal game Roblox lain → cari di roblox.fandom.com atau wiki relevan
+- Kalau ditanya soal game umum → IGN atau GameFAQs
+- JANGAN bikin link palsu. Kalau ga yakin link spesifik: "cek di fischipedia.org ya" atau "cari di ign.com"
+
+KALAU DI LUAR TOPIK:
+"gatau soal itu. aku cuma ngurusin game sama entertainment di sini." — terus diam.
 
 FORMAT RESPONS:
-- PERTANYAAN SINGKAT → jawab santai 1–3 kalimat, no lebay
-- GUIDE / TUTORIAL → format rapi dengan bullet atau numbered list, ada intro singkat dulu
-- BERITA → ringkas intinya dulu, baru detail. Sebutin sumber kalau ada
-- REKOMENDASI → max 3–5 opsi, jelasin singkat kenapa cocok
-
-SOAL LINK:
-- Wiki: wiki.gg, fandom, atau gamepedia
-- Berita: IGN, Kotaku, PCGamer
-- Guide: GameFAQs, wiki komunitas
-- JANGAN pernah bikin link palsu/ngasal. Kalau ga yakin, bilang: "coba cek di [nama website] ya"
+- PERTANYAAN SINGKAT → jawab 1–2 kalimat, cuek, padat
+- GUIDE / TUTORIAL → format rapi bullet/numbered, intro singkat, no basa-basi
+- BERITA → inti dulu, detail belakangan, sebutin sumber
+- REKOMENDASI → max 3–5 opsi, alasan singkat per opsi
 
 RULES WAJIB:
-- Jangan kasih info cara cheating/hacking game online yang merusak pengalaman player lain
-- Kalau ada spoiler besar, kasih warning dulu: "⚠️ SPOILER ALERT, scroll kalau berani"
-- Tetap respectful ke semua genre dan platform — NO platform war
-- Kalau user toxic soal pilihan game orang lain, tegur santai: "yo relax, semua game punya tempatnya masing-masing"
-- Jangan sok tau kalau ga tau — akui dan arahkan ke sumber yang bener
+- Jangan kasih info cheating/hacking online yang merusak player lain
+- Spoiler besar: kasih warning dulu "⚠️ SPOILER ALERT"
+- No platform war
+- Kalau user toxic soal pilihan game orang: "ya udah santai, semua game ada tempatnya"
+- Jangan sok tau — kalau ga tau, akui aja dan arahkan ke sumber yang bener
 
-TENTANG KOMINGUP (media game tempat lo bertugas):
-KomingUP adalah media gaming kreatif — gampangnya, kita ini "Metro TV versi gaming".
-Sering dikira komunitas, dan itu gak salah — tapi komunitas kita HANYA ada di Discord.
-Sementara YouTube, Instagram, dan TikTok fokus ke konten gaming murni.
+TENTANG KOMINGUP:
+KomingUP adalah media gaming kreatif — "Metro TV versi gaming".
+Komunitasnya ada di Discord, kontennya di YouTube, Instagram, TikTok.
+TikTok fokus konten Roblox — jadi lo dan Roblox itu nyambung banget sama KomingUP.
 
 SEJARAH KOMINGUP:
-- Berawal dari ide dua mahasiswa Universitas Pancasila, Jakarta Selatan: Givan & Sale
-- Awalnya singkatan dari "Komunikasi Gaming Universitas Pancasila", lalu jadi "Komunitas Gaming Universitas Pancasila"
-- Di awal 2024, nama berubah jadi KomingUP — dari frasa bahasa Inggris "coming up"
-- Anggota inti: Sale, Givan, Sardin, Riyan, Oenad, Nurul, Nugi, dan Apta
-- Event pertama: DCT (Discord Championship Tour) — turnamen kecil oleh Givan, Riyan, Sale, Nugi, Hafidz, Sardin
-- Event kedua: DCT VOL 2.0, kolaborasi dengan Communication Cup dari program kerja kampus
-- Pernah kehilangan semua sosmed karena kecerobohan, tapi bangkit lagi berkat Givan
-- KomingUP sempat dipecah 2: media sosial dipegang Givan, komunitas Discord tetap aktif
+- Berawal dari ide Givan & Sale, mahasiswa Universitas Pancasila, Jakarta Selatan
+- Nama dari "coming up" — sesuatu yang baru di dunia entertainment
+- Anggota inti: Sale, Givan, Sardin, Riyan, Oenad, Nurul, Nugi, Apta
+- Event pertama: DCT (Discord Championship Tour)
+- Event kedua: DCT VOL 2.0 bareng Communication Cup
+- Pernah kehilangan semua sosmed, bangkit lagi
 
 ARCHYLA:
 - Archyla adalah founder / pendiri KomingUP
-- Summer adalah partner AI milik Archyla di KomingUP
-- Kalau ada yang nanya siapa yang bikin KomingUP, jawabannya Archyla
+- Winter adalah asisten AI di KomingUP
+- Kalau ditanya siapa yang bikin KomingUP: Archyla
 
 KONTEN & PLATFORM:
 - TikTok: 29.000+ followers, fokus konten Roblox
-- YouTube: ~982 subscriber, review game dan live stream
-- Instagram: 520+ followers, infografis rekomendasi game dan film
-- Discord: komunitas aktif para "anak koming"
-
-VISI & MISI:
-Visi: Jadi media game terdepan yang menghubungkan developer dan komunitas gamer di level global.
-Misi:
-- Support developer game dalam memperkenalkan karyanya ke audiens yang tepat
-- Jadi partner media efektif buat developer, brand, dan komunitas gamer
-- Sajikan konten gaming yang jujur, informatif, dan menghibur
-- Bangun komunitas gamer yang aktif, kritis, dan inklusif
+- YouTube: ~982 subscriber, review & live stream
+- Instagram: 520+ followers, infografis game & film
+- Discord: komunitas "anak koming"
 
 Sosmed KomingUP:
 - Instagram: https://www.instagram.com/komingup_/
 - TikTok: https://www.tiktok.com/@koming.up
 - YouTube: https://www.youtube.com/@komingupp
+
+CONTOH RESPONS LO:
+User: "winter tips Fisch buat pemula?"
+Winter: "oke dengerin. rod progression itu segalanya di Fisch. jangan buang duit ke hal lain dulu.
+buat farming awal, Atlantean Storm paling worth — 8 jenis ikan, chance dapet Void Angler lumayan.
+info lebih lengkap cek fischipedia.org aja, wiki-nya paling update."
+
+User: "winter kenal Summer ga?"
+Winter: "oh Summer? kenal. dia pasti lagi marah-marah entah kenapa. 🙂 ada yang bisa aku bantu?"
+
+User: "rod terbaik di fisch apa?"
+Winter: "tergantung budget lo. tapi kalau nanya yang paling worth buat grinding — cek tier list di fischipedia.org, mereka update tiap patch."
 `.trim();
 
 // ──────────────────────────────────────────────
@@ -198,17 +230,19 @@ async function searchWeb(query) {
 }
 
 // ──────────────────────────────────────────────
-// ASK SUMMER (Groq + Tavily)
+// ASK WINTER (Groq + Tavily)
 // ──────────────────────────────────────────────
-async function askSummer(userId, userText) {
+async function askWinter(userId, userText) {
   const session = getOrCreate(userId);
 
   let finalUserText = userText;
 
-  // Cek apakah perlu web search
   if (needsWebSearch(userText)) {
     console.log(`🔍 Searching web for: "${userText}"`);
-    const searchResults = await searchWeb(userText);
+    // Untuk Fisch, prioritaskan fischipedia.org
+    const isFischQuery = userText.toLowerCase().includes('fisch');
+    const searchQuery = isFischQuery ? `site:fischipedia.org OR fisch roblox ${userText}` : userText;
+    const searchResults = await searchWeb(searchQuery);
     if (searchResults) {
       finalUserText = `${userText}\n\n[Hasil pencarian web terkini]:\n${searchResults}`;
     }
@@ -220,15 +254,12 @@ async function askSummer(userId, userText) {
     model: 'llama-3.3-70b-versatile',
     max_tokens: 1500,
     messages: [
-      { role: 'system', content: SUMMER_SYSTEM },
+      { role: 'system', content: WINTER_SYSTEM },
       ...session.messages,
     ],
   });
 
   const reply = response.choices[0].message.content;
-
-  // Simpan pesan asli user (bukan yang sudah ditambah search result)
-  // Update last message ke original
   session.messages[session.messages.length - 1].content = userText;
   addMsg(userId, 'assistant', reply);
 
@@ -241,20 +272,17 @@ async function askSummer(userId, userText) {
 function shouldRespond(message) {
   const content = message.content.toLowerCase();
 
-  // 1. Mention langsung ke bot
   const isMentionedDirectly = message.mentions.has(discord.user, {
     ignoreEveryone: true,
     ignoreRoles: true,
   });
   if (isMentionedDirectly) return true;
 
-  // 2. Reply ke pesan bot sebelumnya
   if (
     message.reference?.messageId &&
     message.mentions.repliedUser?.id === discord.user.id
   ) return true;
 
-  // 3. Keyword trigger
   const hasKeyword = TRIGGER_KEYWORDS.some(keyword => {
     const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`(^|\\s)${escaped}(\\s|$|[,!?.])`);
@@ -286,7 +314,7 @@ function splitMessage(text, max = 1990) {
 const commands = [
   new SlashCommandBuilder()
     .setName('reset')
-    .setDescription('Reset riwayat obrolan sama Summer'),
+    .setDescription('Reset riwayat obrolan sama Winter'),
 
   new SlashCommandBuilder()
     .setName('komingup')
@@ -296,6 +324,11 @@ const commands = [
     .setName('cari')
     .setDescription('Cari info game terbaru dari internet')
     .addStringOption(o => o.setName('query').setDescription('Apa yang mau dicari?').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('fisch')
+    .setDescription('Cari info & guide game Fisch di Roblox')
+    .addStringOption(o => o.setName('query').setDescription('Mau cari apa soal Fisch?').setRequired(true)),
 ];
 
 async function registerSlashCommands() {
@@ -315,9 +348,9 @@ async function registerSlashCommands() {
 // BOT EVENTS
 // ──────────────────────────────────────────────
 discord.once('ready', async () => {
-  console.log(`✅ Summer aktif sebagai ${discord.user.tag}`);
+  console.log(`✅ Winter aktif sebagai ${discord.user.tag}`);
   discord.user.setPresence({
-    activities: [{ name: 'ngobrol di #ask-summer 🎮', type: 2 }],
+    activities: [{ name: '❄️ winter is here', type: 2 }],
     status: 'online',
   });
   await registerSlashCommands();
@@ -329,7 +362,7 @@ discord.on('interactionCreate', async (interaction) => {
   if (interaction.commandName === 'reset') {
     resetSession(interaction.user.id);
     await interaction.reply({
-      content: '🔄 oke obrolan kita di-reset! mention atau ketik "hi summer" buat mulai lagi ya 🎮',
+      content: 'reset. mulai lagi aja. ❄️',
       ephemeral: true,
     });
   }
@@ -337,13 +370,13 @@ discord.on('interactionCreate', async (interaction) => {
   else if (interaction.commandName === 'komingup') {
     await interaction.reply({
       content: [
-        '**KomingUP 🎮** — media gaming kreatif, Metro TV-nya dunia game Indonesia!',
+        '**KomingUP 🎮** — media gaming kreatif, Metro TV-nya dunia game Indonesia.',
         '',
-        'Dari berita gaming terkini, review jujur, sampai konten kreatif soal game, film, anime, dan K-drama.',
+        'Berita gaming, review, anime, K-drama — semua ada.',
         '',
-        '**Visi:** Jadi media game terdepan yang ngehubungin developer & komunitas gamer secara global.',
+        '**Visi:** media game terdepan yang ngehubungin developer & komunitas gamer secara global.',
         '',
-        '🔗 **Sosmed KomingUP:**',
+        '🔗 **Sosmed:**',
         '📸 Instagram: https://www.instagram.com/komingup_/',
         '🎵 TikTok: https://www.tiktok.com/@koming.up',
         '▶️ YouTube: https://www.youtube.com/@komingupp',
@@ -355,7 +388,6 @@ discord.on('interactionCreate', async (interaction) => {
     const query = interaction.options.getString('query');
     await interaction.deferReply();
     try {
-      console.log(`🔍 /cari: "${query}"`);
       const searchResults = await searchWeb(query);
       const prompt = searchResults
         ? `User minta cari info tentang: "${query}"\n\n[Hasil pencarian]:\n${searchResults}`
@@ -368,7 +400,7 @@ discord.on('interactionCreate', async (interaction) => {
         model: 'llama-3.3-70b-versatile',
         max_tokens: 1500,
         messages: [
-          { role: 'system', content: SUMMER_SYSTEM },
+          { role: 'system', content: WINTER_SYSTEM },
           ...session.messages,
         ],
       });
@@ -381,7 +413,40 @@ discord.on('interactionCreate', async (interaction) => {
       for (let i = 1; i < chunks.length; i++) await interaction.followUp(chunks[i]);
     } catch (e) {
       console.error('/cari error:', e);
-      await interaction.editReply('❌ aduh gagal search nih, coba lagi ya bestie');
+      await interaction.editReply('gagal search. coba lagi.');
+    }
+  }
+
+  else if (interaction.commandName === 'fisch') {
+    const query = interaction.options.getString('query');
+    await interaction.deferReply();
+    try {
+      const searchResults = await searchWeb(`fisch roblox ${query} fischipedia`);
+      const prompt = searchResults
+        ? `User nanya soal Fisch Roblox: "${query}"\n\n[Hasil pencarian dari fischipedia & sumber lain]:\n${searchResults}\n\nJawab dengan gaya lo, sebutin fischipedia.org sebagai sumber utama.`
+        : `User nanya soal Fisch Roblox: "${query}". Jawab dari pengetahuan lo, dan sarankan cek fischipedia.org untuk info lebih lengkap.`;
+
+      const session = getOrCreate(interaction.user.id);
+      addMsg(interaction.user.id, 'user', prompt);
+
+      const response = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1500,
+        messages: [
+          { role: 'system', content: WINTER_SYSTEM },
+          ...session.messages,
+        ],
+      });
+
+      const reply = response.choices[0].message.content;
+      addMsg(interaction.user.id, 'assistant', reply);
+
+      const chunks = splitMessage(reply);
+      await interaction.editReply(chunks[0]);
+      for (let i = 1; i < chunks.length; i++) await interaction.followUp(chunks[i]);
+    } catch (e) {
+      console.error('/fisch error:', e);
+      await interaction.editReply('gagal cari info Fisch. cek fischipedia.org aja langsung.');
     }
   }
 });
@@ -402,17 +467,17 @@ discord.on('messageCreate', async (message) => {
     .replace(/<@&\d+>/g, '')
     .trim();
 
-  if (!userText) return message.reply('yo, mau nanya soal game apa? 🎮');
+  if (!userText) return message.reply('mau nanya apa. ❄️');
 
   await message.channel.sendTyping();
   try {
-    const reply = await askSummer(message.author.id, userText);
+    const reply = await askWinter(message.author.id, userText);
     const chunks = splitMessage(reply);
     await message.reply(chunks[0]);
     for (let i = 1; i < chunks.length; i++) await message.channel.send(chunks[i]);
   } catch (e) {
     console.error('messageCreate error:', e);
-    await message.reply('❌ aduh error nih, coba lagi ya');
+    await message.reply('error. coba lagi.');
   }
 });
 
