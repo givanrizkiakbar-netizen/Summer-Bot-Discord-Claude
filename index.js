@@ -251,7 +251,7 @@ async function askWinter(userId, userText) {
   addMsg(userId, 'user', finalUserText);
 
   const response = await groq.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
+    model: 'gpt-oss-20b',
     max_tokens: 1500,
     messages: [
       { role: 'system', content: WINTER_SYSTEM },
@@ -397,7 +397,7 @@ discord.on('interactionCreate', async (interaction) => {
       addMsg(interaction.user.id, 'user', prompt);
 
       const response = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
+        model: 'gpt-oss-20b',
         max_tokens: 1500,
         messages: [
           { role: 'system', content: WINTER_SYSTEM },
@@ -430,7 +430,7 @@ discord.on('interactionCreate', async (interaction) => {
       addMsg(interaction.user.id, 'user', prompt);
 
       const response = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
+        model: 'gpt-oss-20b',
         max_tokens: 1500,
         messages: [
           { role: 'system', content: WINTER_SYSTEM },
